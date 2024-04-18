@@ -11,7 +11,7 @@
     src_api(REST API) <-->
       |Call API| python_script
 
-    src_db(Database) -->
+    src_db(RDS Database) -->
       |Copy Snapshot| data_lake_s3
 
     src_stream(Kafka) <-->
@@ -41,18 +41,21 @@
 
 ## Tools
 
-Assuming AWS as a cloud provider
+Assuming AWS as the cloud provider
 
 - Python script for REST APIs
   - Pair with Lambda, ECS, AWS Batch
 - Apache Spark for ingesting stream data and transforming raw data
+- Apache Airflow for scheduling and orchestrating Spark jobs
+  - Consider managed flow, like AWS MWAA
 - S3 for storing raw data in data lake
 - Apache Iceberg to query across S3 data lake
-- Redshift for storing dimensions, facts, aggregated analytics
+- Redshift as the data warehouse
 - SQL is used for Trino, Iceberg, and Redshift
+- GitLab for version control and CI/CD
 - Power BI or Tableau for analysts, but may be analysts tool of choice
 
-## Extract
+## Extract & Load
 
 ```mermaid
 
@@ -63,7 +66,7 @@ Assuming AWS as a cloud provider
   src_api(REST API) <-->
     |Call API| python_script
 
-  src_db(Database) -->
+  src_db(RDS Database) -->
     |Copy Snapshot| data_lake_s3
 
   src_stream(Kafka) <-->
@@ -85,21 +88,34 @@ Assuming AWS as a cloud provider
   - Fine control over logic, testable, but must maintain
 - Apache Spark can read events over a window, and store in S3
 - S3 is used as a Data Lake to store raw data
+  - Data retention policy to move expired data to S3 Glacier or remove
 - Apache Iceberg to maintain raw data metadata
 - Trino to query across raw data with SQL
+- Data Engineers and possibly Data Scientists have access to Data Lake
 
+## Transform
 
-## Data Warehouse
+```mermaid
+
+  flowchart LR
+
+  data_lake_s3(Data Lake) --> spark(Spark)
+
+  spark -->
+    |Transformation| redshift(Redshift)
+```
+
+- Transform data from the Data Lake and load into Redshift using Spark
+  - Data validation steps included here
+- Includes multi-step data pipelines orchestrated by Airflow
+- Dimensions, facts, and aggregations stored here
+
+## Data Warehousing
+
+- Various read-only access roles for analysts, data scientists, etc.
+- Star schema data modeling with fact tables and their corresponding dimensions
 
 ## Analytics
 
-- Use a Python script to interact with REST APIs
-  - Use API provided SDK or requests library
-  - Schedule the task when next day of data available (Airflow or EventBridge)
-  - Script allows platform versatility (Lambda, ECS task, AWS Batch)
-  - Unit test script
-- Export daily snapshots from RDS to S3
-  - Snapshots should be available as part of disaster recovery anyway
-  - AWS exports in compressed parquet format
-- Spark Streaming read from Kafka
-  - Batch events with Spark and write to S3 in relatively raw format
+- Power BI or Tableau connect to Redshift to perform analytics, create dashboards, etc.
+- Granted necessary access role for their business line
